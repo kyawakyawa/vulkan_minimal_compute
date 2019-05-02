@@ -14,6 +14,7 @@ distrib/build_*/*
 makefile
 screenshot.bmp
 docs/
+.vscode/*
 
 Win32/
 docs/
@@ -25,3 +26,4 @@ head.obj
 mask.obj
 venus.obj
 marble.png
+compile_commands.json

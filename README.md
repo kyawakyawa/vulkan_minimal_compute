@@ -24,3 +24,14 @@ should use CMake to generate a "Visual Studio Solution"/makefile,
 and then use that to compile the program. If you then run the program,
 a file named `mandelbrot.png` should be created. This is a Mandelbrot
 set that has been rendered by using Vulkan. 
+
+### For Arch Linux
+```
+$ sudo pacman -S vulkan-headers vulkan-validation-layer
+$ sudo pacman -S vulkan-tools # for vulkaninfo
+```
+
+#### If you use intel graphics
+```
+$ sudo pacman -S vulkan-intel
+```
