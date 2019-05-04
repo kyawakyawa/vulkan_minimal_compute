@@ -10,7 +10,7 @@
 
 constexpr  int32_t kWidth          = 3200;       // マンデルブロ集合のレンダリング結果の幅
 constexpr  int32_t kHeight         = 2400;       // マンデルブロ集合のレンダリング結果の高さ
-constexpr  int32_t kWorkgroupeSize = 32;         // Workgroup の大きさ (Nvidia の Warp)
+constexpr  int32_t kWorkgroupSize = 32;         // Workgroup の大きさ (Nvidia の Warp)
 
 #ifdef NDEBUG
 constexpr bool kEnableValidationLayers = false;
@@ -133,8 +133,6 @@ class ComputeApplication {
       // 最後に記録されたコマンドバッファの中身を実行する
       RunCommandBuffer();
 
-      // The former command rendered a mandelbrot set to a buffer.
-      // Save that buffer as a png on disk.
       // レンダリングされたマンデルブロ集合をバッファに入れる
       // バッファはpngとしてディスクに保存される
       SaveRenderedImage();
@@ -144,9 +142,7 @@ class ComputeApplication {
     }
 
     void CreateInstance() {
-      /*
-       * 有効な拡張の名前
-       */
+      //有効な拡張の名前
       std::vector<const char *> enabled_extensions;
 
       /*
@@ -159,10 +155,16 @@ class ComputeApplication {
          * vkEnumerateInstanceLayerProperties()関数で全てのレイヤーを取得する
          */
         uint32_t layer_count;
-        vkEnumerateInstanceLayerProperties(&layer_count, nullptr);// nullptrを渡すとレイヤーの数を取得できる
+        // nullptrを渡すとレイヤーの数を取得できる
+        vkEnumerateInstanceLayerProperties(/*uint32_t *pPropertyCount      =*/&layer_count,
+                                           /*VkLayerProperties *pProperties=*/nullptr
+        );
 
         std::vector<VkLayerProperties> layer_properties(layer_count);
-        vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
+        // layer_count個のプロパティを取得する
+        vkEnumerateInstanceLayerProperties(/*uint32_t *pPropertyCount      =*/&layer_count,
+                                           /*VkLayerProperties *pProperties=*/layer_properties.data()
+        );
 
         /*
          * サポートされるレイヤーにVK_LAYER_LUNARG_standard_validtionが含まれるか調べる
@@ -179,7 +181,8 @@ class ComputeApplication {
         if (!found_layer) {
           throw std::runtime_error("Layer VK_LAYER_LUNARG_standard_validation not supported\n");
         }
-        enabled_layers.push_back("VK_LAYER_LUNARG_standard_validation"); // このレイヤーを使うことが出来る
+        // このレイヤーを使うことが出来る
+        enabled_layers.push_back("VK_LAYER_LUNARG_standard_validation");
 
         /*
          * 検証レイヤーが発する警告を出力するために
@@ -190,9 +193,16 @@ class ComputeApplication {
 
         uint32_t extension_count;
 
-        vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
+        // 同様に拡張のプロパティを取得する
+        vkEnumerateInstanceExtensionProperties(/*const char *pLayerName            =*/nullptr,
+                                               /*uint32_t *pPropertyCount          =*/&extension_count,
+                                               /*VkExtensionProperties *pProperties=*/nullptr
+                                              );
         std::vector<VkExtensionProperties> extension_properties(extension_count);
-        vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, extension_properties.data());
+        vkEnumerateInstanceExtensionProperties(/*const char *pLayerName            =*/nullptr,
+                                               /*uint32_t *pPropertyCount          =*/&extension_count,
+                                               /*VkExtensionProperties *pProperties=*/extension_properties.data()
+                                              );
 
         bool found_extension = false;
         for (VkExtensionProperties prop : extension_properties) {
@@ -244,10 +254,12 @@ class ComputeApplication {
        * 実際にインスタンスを作る
        * インスタンスを作ると、vulkanを使い始めることが出来る
        */
-      VK_CHECK_RESULT(vkCreateInstance(
-            &create_info,
-            nullptr,
-            &instance));
+
+      VK_CHECK_RESULT(
+        vkCreateInstance(/*const VkInstanceCreateInfo *pCreateInfo=*/&create_info ,
+                         /*const VkAllocationCallbacks *pAllocator=*/nullptr,
+                         /*VkInstance *pInstance                  =*/&instance)
+      );
 
       /*
        * VK_EXT_DEBUG_REPORT_EXTENSION_NAMEで使うコールバック関数を登録する
@@ -343,11 +355,23 @@ class ComputeApplication {
       device_create_info.queueCreateInfoCount = 1;
       device_create_info.pEnabledFeatures     = &device_features;
 
-      VK_CHECK_RESULT(vkCreateDevice(physical_device, &device_create_info, nullptr, &device)); // 論理デバイスを作成
+      // 論理デバイスを作成
+      VK_CHECK_RESULT(
+        vkCreateDevice(/*VkPhysicalDevice physicalDevice        =*/physical_device,
+                       /*const VkDeviceCreateInfo *pCreateInfo  =*/&device_create_info,
+                       /*const VkAllocationCallbacks *pAllocator=*/nullptr,
+                       /*VkDevice *pDevice                      =*/&device
+                       )
+      );
 
       // Get a handle to the only member of the queue family.
       // TODO (kyawakyawa) : add japanese comment
-      vkGetDeviceQueue(device, queue_family_index, 0, &queue);
+      vkGetDeviceQueue(
+        /*VkDevice device          =*/device,
+        /*uint32_t queueFamilyIndex=*/queue_family_index,
+        /*uint32_t queueIndex      =*/0,
+        /*VkQueue *pQueue          =*/&queue
+      );
     }
 
     void CreateBuffer() {
@@ -362,7 +386,14 @@ class ComputeApplication {
       buffer_create_info.usage              = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; // バッファはストレージバッファとして用いられる
       buffer_create_info.sharingMode        = VK_SHARING_MODE_EXCLUSIVE; // バッファは一度に一つのキューファミリーに独占される
 
-      VK_CHECK_RESULT(vkCreateBuffer(device, &buffer_create_info, nullptr, &buffer)); // バッファを作成する
+      // バッファを作成する
+      VK_CHECK_RESULT(
+        vkCreateBuffer(/*VkDevice device                        =*/device,
+                       /*const VkBufferCreateInfo *pCreateInfo  =*/&buffer_create_info,
+                       /*const VkAllocationCallbacks *pAllocator=*/nullptr,
+                       /*VkBuffer *pBuffer                      =*/&buffer
+                       )
+      );
 
       /*
        * バッファ自身でメモリを確保しないので、手動で確保する必要がある
@@ -372,7 +403,10 @@ class ComputeApplication {
        * まずバッファが要求するメモリ要件を調べる
        */
       VkMemoryRequirements memory_requirements;
-      vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
+      vkGetBufferMemoryRequirements(/*VkDevice device                          =*/device,
+                                    /*VkBuffer buffer                          =*/buffer,
+                                    /*VkMemoryRequirements *pMemoryRequirements=*/&memory_requirements
+                                   );
 
       /*
        * バッファのためメモリを確保のためにメモリ要件を用いる
@@ -397,13 +431,26 @@ class ComputeApplication {
       allocate_info.memoryTypeIndex = FindMemoryType(
           memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-      VK_CHECK_RESULT(vkAllocateMemory(device, &allocate_info, nullptr, &buffer_memory)); // デバイス上のメモリを確保する
+      // デバイス上のメモリを確保する
+      VK_CHECK_RESULT(
+        vkAllocateMemory(/*VkDevice device                          =*/device,
+                         /*const VkMemoryAllocateInfo *pAllocateInfo=*/&allocate_info,
+                         /*const VkAllocationCallbacks *pAllocator  =*/nullptr,
+                         /*VkDeviceMemory *pMemory                  =*/&buffer_memory
+                        )
+      );
 
       /* 
        * 確保したメモリとバッファを関連付ける
        * これによって実際のメモリによってバッファが使えるようになる
        */
-      VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, buffer_memory, 0));
+      VK_CHECK_RESULT(
+        vkBindBufferMemory(/*VkDevice device          =*/device,
+                           /*VkBuffer buffer          =*/buffer,
+                           /*VkDeviceMemory memory    =*/buffer_memory,
+                           /*VkDeviceSize memoryOffset=*/0
+                          )
+      )
     }
 
     void CreateDescriptorSetLayout() {
@@ -433,7 +480,14 @@ class ComputeApplication {
       descriptor_set_layout_create_info.pBindings    = &descriptor_set_layout_binding; 
 
       // Descriptorの集まりのレイアウトを作成する
-      VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptor_set_layout_create_info, NULL, &descriptor_set_layout));
+      VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(/*VkDevice device                                   =*/device,
+                                    /*const VkDescriptorSetLayoutCreateInfo *pCreateInfo=*/&descriptor_set_layout_create_info,
+                                    /*const VkAllocationCallbacks *pAllocator           =*/nullptr,
+                                    /*VkDescriptorSetLayout *pSetLayout                 =*/&descriptor_set_layout
+                                   )
+      );
+
     }
 
     void CreateDescriptorSet() {
@@ -456,7 +510,13 @@ class ComputeApplication {
       descriptor_pool_create_info.pPoolSizes    = &descriptor_pool_size;
 
       // descriptorを作成する
-      VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptor_pool_create_info, nullptr, &descriptor_pool));
+      VK_CHECK_RESULT(
+        vkCreateDescriptorPool(/*VkDevice device                              =*/device,
+                               /*const VkDescriptorPoolCreateInfo *pCreateInfo=*/&descriptor_pool_create_info,
+                               /*const VkAllocationCallbacks *pAllocator      =*/nullptr,
+                               /*VkDescriptorPool *pDescriptorPool            =*/&descriptor_pool
+                              )
+      );
 
       /*
        * プールが確保されたら、descriptorの集まりを確保する
@@ -469,7 +529,12 @@ class ComputeApplication {
 
       // allocate descriptor set.
       //  descriptorの集まりを確保する
-      VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptor_set_allocate_info, &descriptor_set));
+      VK_CHECK_RESULT(
+        vkAllocateDescriptorSets(/*VkDevice device                                 =*/device,
+                                 /*const VkDescriptorSetAllocateInfo *pAllocateInfo=*/&descriptor_set_allocate_info,
+                                 /*VkDescriptorSet *pDescriptorSets                =*/&descriptor_set
+                                )
+      );
 
       /*
        * descriptorとストレージバッファをつなげる
@@ -492,7 +557,12 @@ class ComputeApplication {
       write_descriptor_set.pBufferInfo     = &descriptor_buffer_info;
 
       // descriptorの集合の更新を行う
-      vkUpdateDescriptorSets(device, 1, &write_descriptor_set, 0, nullptr);
+      vkUpdateDescriptorSets(/*VkDevice device                              =*/device,
+                             /*uint32_t descriptorWriteCount                =*/1,
+                             /*const VkWriteDescriptorSet *pDescriptorWrites=*/&write_descriptor_set,
+                             /*uint32_t descriptorCopyCount                 =*/0,
+                             /*const VkCopyDescriptorSet *pDescriptorCopies =*/nullptr
+                            );
     }
 
     void CreateComputePipeline() {
@@ -517,7 +587,13 @@ class ComputeApplication {
       create_info.pCode    = code;
       create_info.codeSize = file_length;
 
-      VK_CHECK_RESULT(vkCreateShaderModule(device, &create_info, nullptr, &compute_shader_module));
+      VK_CHECK_RESULT(
+        vkCreateShaderModule(/*VkDevice device                            */device,
+                             /*const VkShaderModuleCreateInfo *pCreateInfo*/&create_info,
+                             /*const VkAllocationCallbacks *pAllocator    */nullptr,
+                             /*VkShaderModule *pShaderModule              */&compute_shader_module
+                            )
+      );
       delete[] code;
 
       /*
@@ -542,7 +618,13 @@ class ComputeApplication {
       pipeline_layout_create_info.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
       pipeline_layout_create_info.setLayoutCount = 1;
       pipeline_layout_create_info.pSetLayouts    = &descriptor_set_layout; 
-      VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipeline_layout_create_info, nullptr, &pipeline_layout));
+      VK_CHECK_RESULT(
+        vkCreatePipelineLayout(/*VkDevice device                              =*/device,
+                               /*const VkPipelineLayoutCreateInfo *pCreateInfo=*/&pipeline_layout_create_info,
+                               /*const VkAllocationCallbacks *pAllocator      =*/nullptr,
+                               /*VkPipelineLayout *pPipelineLayout            =*/&pipeline_layout
+                              )
+      );
 
       VkComputePipelineCreateInfo pipeline_create_info = {};
       pipeline_create_info.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -552,10 +634,15 @@ class ComputeApplication {
       /*
        * 最後にcomputeパイプラインを作成する
        */
-      VK_CHECK_RESULT(vkCreateComputePipelines(
-            device, VK_NULL_HANDLE,
-            1, &pipeline_create_info,
-            NULL, &pipeline));
+      VK_CHECK_RESULT(
+        vkCreateComputePipelines(/*VkDevice device                                */device,
+                                 /*VkPipelineCache pipelineCache                  */VK_NULL_HANDLE,
+                                 /*uint32_t createInfoCount                       */1,
+                                 /*const VkComputePipelineCreateInfo *pCreateInfos*/&pipeline_create_info,
+                                 /*const VkAllocationCallbacks *pAllocator        */nullptr,
+                                 /*VkPipeline *pPipelines                         */&pipeline
+                                )
+      );
     }
 
     void CreateCommandBuffer() {
@@ -574,7 +661,13 @@ class ComputeApplication {
        * このファミリーのキューにのみサブミットされなければならない
        */
       command_pool_create_info.queueFamilyIndex = queue_family_index;
-      VK_CHECK_RESULT(vkCreateCommandPool(device, &command_pool_create_info, nullptr, &command_pool));
+      VK_CHECK_RESULT(
+        vkCreateCommandPool(/*VkDevice device                           =*/device,
+                            /*const VkCommandPoolCreateInfo *pCreateInfo=*/&command_pool_create_info,
+                            /*const VkAllocationCallbacks *pAllocator   =*/nullptr,
+                            /*VkCommandPool *pCommandPool               =*/&command_pool
+                           )
+      );
 
       /*
        * ここで、コマンドプールからコマンドバッファを確保する
@@ -590,7 +683,13 @@ class ComputeApplication {
        */
       command_buffer_allocate_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
       command_buffer_allocate_info.commandBufferCount = 1; // 一つのコマンドバッファを確保する
-      VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &command_buffer_allocate_info, &command_buffer)); // コマンドバッファを取得する
+      // コマンドバッファを取得する
+      VK_CHECK_RESULT(
+        vkAllocateCommandBuffers(/*VkDevice device                                 =*/device,
+                                 /*const VkCommandBufferAllocateInfo *pAllocateInfo=*/&command_buffer_allocate_info,
+                                 /*VkCommandBuffer *pCommandBuffers                =*/&command_buffer
+                                )
+      );
 
       /*
        * 新しく確保したコマンドバッファにコマンドを記録する
@@ -598,15 +697,32 @@ class ComputeApplication {
       VkCommandBufferBeginInfo begin_info = {};
       begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
       begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // このプログラムではバッファは一度だけサブミットされ一度だけ使われる
-      VK_CHECK_RESULT(vkBeginCommandBuffer(command_buffer, &begin_info)); // コマンドの記録を開始する
+      // コマンドの記録を開始する
+      VK_CHECK_RESULT(
+        vkBeginCommandBuffer(/*VkCommandBuffer commandBuffer             =*/command_buffer,
+                             /*const VkCommandBufferBeginInfo *pBeginInfo=*/&begin_info
+                            )
+      );
 
       /*
        * バッファにコマンド送信する(Dispatch)前にパイプラインとdescriptor setを紐付ける必要がある
        *
        * 検証レイヤーはこれを忘れると警告を出さなくなるので忘れないように注意する必要がある
        */
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-      vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+      vkCmdBindPipeline(/*VkCommandBuffer commandBuffer        =*/command_buffer,
+                        /*VkPipelineBindPoint pipelineBindPoint=*/VK_PIPELINE_BIND_POINT_COMPUTE,
+                        /*VkPipeline pipeline                  =*/pipeline
+                       );
+
+      vkCmdBindDescriptorSets(/*VkCommandBuffer commandBuffer         */command_buffer,
+                              /*VkPipelineBindPoint pipelineBindPoint */VK_PIPELINE_BIND_POINT_COMPUTE,
+                              /*VkPipelineLayout layout               */pipeline_layout,
+                              /*uint32_t firstSet                     */0,
+                              /*uint32_t descriptorSetCount           */1,
+                              /*const VkDescriptorSet *pDescriptorSets*/&descriptor_set,
+                              /*uint32_t dynamicOffsetCount           */0,
+                              /*const uint32_t *pDynamicOffsets       */nullptr
+                             );
 
       /*
        * ckCmdDispatch関数が呼ばれるとcomputeパイプラインが始まり
@@ -614,9 +730,16 @@ class ComputeApplication {
        * ワークグループの数を引数で指定される
        * OpenGLに慣れている人ならこれは新しいことでは無いはずである
        */
-      vkCmdDispatch(command_buffer, (uint32_t)ceil(kWidth / float(kWorkgroupeSize)), (uint32_t)ceil(kHeight / float(kWorkgroupeSize)), 1);
+      vkCmdDispatch(/*VkCommandBuffer commandBuffer=*/command_buffer,
+                    /*uint32_t groupCountX         =*/static_cast<uint32_t>(ceil(kWidth  / static_cast<float>(kWorkgroupSize))),
+                    /*uint32_t groupCountY         =*/static_cast<uint32_t>(ceil(kHeight / static_cast<float>(kWorkgroupSize))),
+                    /*uint32_t groupCountZ         =*/1
+                   );
 
-      VK_CHECK_RESULT(vkEndCommandBuffer(command_buffer)); // コマンドの記録を終了する
+      // コマンドの記録を終了する
+      VK_CHECK_RESULT(
+        vkEndCommandBuffer(/*VkCommandBuffer commandBuffer=*/command_buffer)
+      );
     }
 
     void RunCommandBuffer() {
@@ -635,22 +758,45 @@ class ComputeApplication {
       VkFenceCreateInfo fence_create_info = {};
       fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
       fence_create_info.flags = 0;
-      VK_CHECK_RESULT(vkCreateFence(device, &fence_create_info, nullptr, &fence));
+      VK_CHECK_RESULT(
+        vkCreateFence(/*VkDevice device                        =*/device,
+                      /*const VkFenceCreateInfo *pCreateInfo   =*/&fence_create_info,
+                      /*const VkAllocationCallbacks *pAllocator=*/nullptr,
+                      /*VkFence *pFence                        =*/&fence
+                     )
+      );
 
       /*
        * キュー上のコマンドバッファをサブミットすると同時に
        * フェンスを与える
        */
-      VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submit_info, fence));
+      VK_CHECK_RESULT(
+        vkQueueSubmit(/*VkQueue queue               */queue,
+                      /*uint32_t submitCount        */1,
+                      /*const VkSubmitInfo *pSubmits*/&submit_info,
+                      /*VkFence fence               */fence
+                     )
+      );
+                     
       /*
        * フェンスが通知されるまでコマンドは実効を終了しない
        * 従ってここで待つ
        * この直後にGPUからバッファを読み取る
        * フェンスを待たないと、コマンドが実行を終了したかどうかはわからない
        */
-      VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
+      VK_CHECK_RESULT(
+        vkWaitForFences(/*VkDevice device       */device,
+                        /*uint32_t fenceCount   */1,
+                        /*const VkFence *pFences*/&fence,
+                        /*VkBool32 waitAll      */VK_TRUE,
+                        /*uint64_t timeout      */100000000000
+                       )
+      );
 
-      vkDestroyFence(device, fence, NULL);
+      vkDestroyFence(/*VkDevice device                        */device,
+                     /*VkFence fence                          */fence,
+                     /*const VkAllocationCallbacks *pAllocator*/nullptr
+                    );
     }
 
 
@@ -705,6 +851,7 @@ class ComputeApplication {
       vkDestroyDevice             (device  , nullptr);
       vkDestroyInstance           (instance, nullptr);		
     }
+
     static VKAPI_ATTR VkBool32 VKAPI_CALL DebugReportCallbackFn(
         VkDebugReportFlagsEXT                       flags,
         VkDebugReportObjectTypeEXT                  objectType,
@@ -724,11 +871,17 @@ class ComputeApplication {
     uint32_t GetComputeQueueFamilyIndex() {
       uint32_t queue_family_count;
 
-      vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
+      vkGetPhysicalDeviceQueueFamilyProperties(/*VkPhysicalDevice physicalDevice                */physical_device,
+                                               /*uint32_t *pQueueFamilyPropertyCount            */&queue_family_count,
+                                               /*VkQueueFamilyProperties *pQueueFamilyProperties*/nullptr
+                                              );
 
       // 全てのキューファミリーを検索する
       std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
-      vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.data());
+      vkGetPhysicalDeviceQueueFamilyProperties(/*VkPhysicalDevice physicalDevice                */physical_device,
+                                               /*uint32_t *pQueueFamilyPropertyCount            */&queue_family_count,
+                                               /*VkQueueFamilyProperties *pQueueFamilyProperties*/queue_families.data()
+                                              );
 
       // 計算をサポートするキューファミリーを見つける
       uint32_t i = 0;
@@ -753,7 +906,9 @@ class ComputeApplication {
     uint32_t FindMemoryType(uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
       VkPhysicalDeviceMemoryProperties memory_properties;
 
-      vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+      vkGetPhysicalDeviceMemoryProperties(/*VkPhysicalDevice physicalDevice                    =*/physical_device,
+                                          /*VkPhysicalDeviceMemoryProperties *pMemoryProperties=*/&memory_properties
+                                         );
 
       /*
        * どのように見つけるかについては
